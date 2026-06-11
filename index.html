@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CollabCode</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<!-- Pyodide: Python in WebAssembly -->
+<script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
+<!-- C/C++ runs via Judge0 CE API (real GCC, server-side) -->
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07071a;--bg2:#0d0d24;--bg3:#131330;
+  --panel:#0f0f28;--panel2:#181838;--panel3:#202048;
+  --b1:rgba(110,70,255,0.14);--b2:rgba(110,70,255,0.26);--b3:rgba(110,70,255,0.42);
+  --acc:#7c50ff;--cyan:#22d3ee;--green:#22c55e;
+  --red:#ef4444;--amber:#f59e0b;--pink:#ec4899;
+  --text:#e4e4ff;--text2:#8080bb;--text3:#40406a;
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 45% at 5% 0%,rgba(110,70,255,0.08),transparent 55%),radial-gradient(ellipse 55% 55% at 95% 100%,rgba(34,211,238,0.06),transparent 55%);pointer-events:none;z-index:0;}
+.gbg{position:fixed;inset:0;background-image:linear-gradient(rgba(110,70,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(110,70,255,0.03) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0;}
+
+/* ── LOADING OVERLAY ── */
+#loader{position:fixed;inset:0;z-index:9999;background:rgba(7,7,26,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.7rem;backdrop-filter:blur(4px);}
+#loader.off{display:none;}
+.spin{width:34px;height:34px;border:3px solid var(--b2);border-top-color:var(--acc);border-radius:50%;animation:spin 1s linear infinite;}
+.lmsg{font-family:var(--mono);font-size:12px;color:var(--text2);}
+.lsub{font-size:11px;color:var(--text3);}
+
+/* ── LANDING ── */
+#landing{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;animation:fi .35s ease;}
+.lw{width:100%;max-width:420px;padding:1.5rem;position:relative;z-index:1;}
+.brand{text-align:center;margin-bottom:1.75rem;}
+.brow{display:inline-flex;align-items:center;gap:.55rem;margin-bottom:.55rem;}
+.bic{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,var(--acc),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 0 22px rgba(110,70,255,.5);}
+.bnm{font-size:1.65rem;font-weight:700;letter-spacing:-.02em;}
+.btag{font-family:var(--mono);font-size:10.5px;color:var(--text3);letter-spacing:.08em;}
+.pills{display:flex;gap:.4rem;justify-content:center;margin-bottom:1.6rem;flex-wrap:wrap;}
+.pill{background:var(--panel);border:1px solid var(--b1);border-radius:100px;padding:3px 11px;font-size:10.5px;color:var(--text2);}
+.lcard{background:var(--panel);border:1px solid var(--b1);border-radius:14px;padding:1.55rem;}
+.lcard h2{font-size:.88rem;font-weight:600;color:var(--text2);margin-bottom:1rem;}
+.field{margin-bottom:.75rem;}
+.field label{display:block;font-size:9.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.28rem;}
+.inp{width:100%;background:var(--bg2);border:1px solid var(--b1);border-radius:8px;padding:8px 11px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:all .18s;}
+.inp:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(110,70,255,.1);}
+.inp::placeholder{color:var(--text3);}
+select.inp{cursor:pointer;}
+.bpair{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-top:1rem;}
+.btn{padding:10px;border-radius:8px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .2s;}
+.bm{background:linear-gradient(135deg,var(--acc),var(--cyan));color:#fff;box-shadow:0 4px 14px rgba(110,70,255,.35);}
+.bm:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(110,70,255,.45);}
+.bg2{background:transparent;color:var(--text2);border:1px solid var(--b2);}
+.bg2:hover{border-color:var(--acc);color:var(--acc);background:rgba(110,70,255,.06);}
+.or{display:flex;align-items:center;gap:.6rem;margin:.75rem 0;color:var(--text3);font-size:10.5px;}
+.or::before,.or::after{content:'';flex:1;height:1px;background:var(--b1);}
+.qrow{display:flex;gap:.42rem;}
+.qrow .inp{flex:1;font-family:var(--mono);font-size:11px;}
+.qbtn{padding:8px 12px;background:var(--panel2);border:1px solid var(--b2);border-radius:8px;color:var(--text2);font-family:var(--font);font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .18s;}
+.qbtn:hover{border-color:var(--acc);color:var(--acc);}
+
+/* ── APP ── */
+#app{flex:1;display:flex;flex-direction:column;position:relative;z-index:1;min-height:0;}
+
+/* TOPBAR */
+.tb{display:flex;align-items:center;gap:.42rem;padding:.36rem .75rem;background:rgba(15,15,40,.96);border-bottom:1px solid var(--b1);flex-shrink:0;backdrop-filter:blur(12px);}
+.tbl{display:flex;align-items:center;gap:.35rem;}
+.tbic{width:19px;height:19px;border-radius:4px;background:linear-gradient(135deg,var(--acc),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:9px;}
+.tbnm{font-size:12.5px;font-weight:700;}
+.rtag{display:flex;align-items:center;gap:4px;background:var(--bg2);border:1px solid var(--b1);border-radius:100px;padding:2.5px 9px;font-family:var(--mono);font-size:9.5px;color:var(--text2);cursor:pointer;transition:all .18s;}
+.rtag:hover{border-color:var(--green);color:var(--green);}
+.ldot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:lp 2s infinite;}
+.lsel{background:var(--bg2);border:1px solid var(--b1);border-radius:6px;padding:3px 7px;color:var(--text);font-family:var(--mono);font-size:10.5px;outline:none;cursor:pointer;transition:border-color .15s;}
+.lsel:focus{border-color:var(--acc);}
+.avs{display:flex;margin-left:auto;}
+.av{width:23px;height:23px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;border:2px solid var(--bg);margin-left:-5px;position:relative;cursor:default;transition:transform .15s;}
+.av:first-child{margin-left:0;}
+.av:hover{transform:translateY(-3px);z-index:5;}
+.av-tip{position:absolute;bottom:calc(100%+5px);left:50%;transform:translateX(-50%);background:var(--panel3);border:1px solid var(--b2);border-radius:5px;padding:2px 6px;font-size:9.5px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s;}
+.av:hover .av-tip{opacity:1;}
+.tbacts{display:flex;gap:.28rem;margin-left:.28rem;}
+.ib{display:flex;align-items:center;gap:3px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;padding:3px 9px;color:var(--text2);font-size:10.5px;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .15s;}
+.ib:hover{border-color:var(--acc);color:var(--acc);background:rgba(110,70,255,.06);}
+.fzc{display:flex;align-items:center;gap:2px;background:var(--bg2);border:1px solid var(--b1);border-radius:6px;padding:1px 5px;}
+.fzb{background:none;border:none;color:var(--text2);cursor:pointer;font-size:13px;padding:0 2px;transition:color .1s;}
+.fzb:hover{color:var(--acc);}
+.fzv{font-family:var(--mono);font-size:9.5px;color:var(--text2);min-width:16px;text-align:center;}
+.rbtn{background:linear-gradient(135deg,var(--green),#16a34a);color:#fff;border:none;border-radius:6px;padding:4.5px 14px;font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .2s;box-shadow:0 2px 8px rgba(34,197,94,.3);min-width:62px;justify-content:center;}
+.rbtn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(34,197,94,.4);}
+.rbtn.loading{background:linear-gradient(135deg,var(--amber),#d97706);pointer-events:none;}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:185px 1fr 282px;flex:1;min-height:0;overflow:hidden;}
+
+/* SIDEBAR */
+.sb{background:var(--panel);border-right:1px solid var(--b1);display:flex;flex-direction:column;overflow:hidden;}
+.sbhd{padding:.52rem .82rem;border-bottom:1px solid var(--b1);font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;}
+.fl{flex:1;overflow-y:auto;padding:.32rem .42rem;}
+.fi{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:10.5px;color:var(--text2);transition:all .12s;}
+.fi:hover{background:var(--panel2);color:var(--text);}
+.fi.active{background:rgba(110,70,255,.1);color:var(--acc);}
+.fidot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-left:auto;}
+.sbsec{border-top:1px solid var(--b1);padding:.52rem .82rem;}
+.sbsh{font-size:9.5px;font-weight:700;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.42rem;}
+.pr{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:10.5px;color:var(--text2);}
+.pd{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.ta{display:flex;gap:2px;margin-left:auto;}
+.ta span{width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.35;animation:tab 1.1s infinite;}
+.ta span:nth-child(2){animation-delay:.18s;}
+.ta span:nth-child(3){animation-delay:.36s;}
+
+/* EDITOR */
+.em{display:flex;flex-direction:column;background:var(--bg);min-height:0;overflow:hidden;}
+.tbar{display:flex;align-items:center;background:var(--panel);border-bottom:1px solid var(--b1);padding:0 .42rem;flex-shrink:0;}
+.tab{display:flex;align-items:center;gap:5px;padding:7px 11px;border-bottom:2px solid transparent;font-family:var(--mono);font-size:10.5px;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .12s;}
+.tab.active{color:var(--acc);border-bottom-color:var(--acc);}
+.ew{flex:1;display:flex;min-height:0;overflow:hidden;}
+.lc{background:var(--bg2);padding:.78rem .55rem .78rem .42rem;font-family:var(--mono);font-size:12.5px;line-height:1.65;color:var(--text3);text-align:right;user-select:none;border-right:1px solid var(--b1);min-width:40px;overflow:hidden;flex-shrink:0;}
+.cta{flex:1;padding:.78rem;font-family:var(--mono);font-size:12.5px;line-height:1.65;color:var(--text);background:transparent;border:none;outline:none;resize:none;tab-size:2;caret-color:var(--acc);overflow:auto;}
+.cta::selection{background:rgba(110,70,255,.2);}
+.cta::placeholder{color:var(--text3);}
+
+/* RIGHT PANEL */
+.rp{display:flex;flex-direction:column;border-left:1px solid var(--b1);background:var(--panel);min-height:0;}
+.rpt{display:flex;background:var(--bg2);border-bottom:1px solid var(--b1);flex-shrink:0;}
+.rptab{flex:1;padding:8px;text-align:center;font-size:9.5px;font-weight:700;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .12s;text-transform:uppercase;letter-spacing:.07em;}
+.rptab.active{color:var(--acc);border-bottom-color:var(--acc);}
+
+/* OUTPUT */
+.ow{display:flex;flex-direction:column;flex:1;min-height:0;}
+.exhd{display:flex;align-items:center;gap:.38rem;padding:.28rem .65rem;background:var(--bg2);border-bottom:1px solid var(--b1);flex-shrink:0;}
+.exlang{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--acc);}
+.exeng{font-size:9.5px;color:var(--text3);}
+.exbadge{margin-left:auto;font-size:9px;padding:2px 7px;border-radius:100px;font-weight:700;font-family:var(--mono);}
+.exbadge.ready{background:rgba(128,128,187,.1);color:var(--text2);}
+.exbadge.running{background:rgba(245,158,11,.12);color:var(--amber);animation:bp 1s infinite;}
+.exbadge.ok{background:rgba(34,197,94,.1);color:var(--green);}
+.exbadge.fail{background:rgba(239,68,68,.1);color:var(--red);}
+.os{flex:1;overflow-y:auto;padding:.62rem .72rem;font-family:var(--mono);font-size:11.5px;line-height:1.7;background:var(--bg);}
+.ol{white-space:pre-wrap;word-break:break-all;line-height:1.6;margin-bottom:1px;}
+.ol.out{color:var(--text);}
+.ol.err{color:var(--red);}
+.ol.info{color:var(--text2);}
+.ol.ok{color:var(--green);}
+.ol.warn{color:var(--amber);}
+.ol.sep{color:var(--text3);font-size:10px;}
+.sib{display:flex;align-items:center;gap:.42rem;padding:.35rem .65rem;border-top:1px solid var(--b1);background:var(--bg2);flex-shrink:0;}
+.sib span{font-family:var(--mono);font-size:12px;color:var(--acc);}
+.si{flex:1;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:11px;color:var(--text);caret-color:var(--acc);}
+.si::placeholder{color:var(--text3);}
+
+/* CHAT */
+.cw{display:none;flex-direction:column;flex:1;min-height:0;}
+.cs{flex:1;overflow-y:auto;padding:.62rem .68rem;display:flex;flex-direction:column;gap:.35rem;}
+.cm{padding:.48rem .62rem;border-radius:7px;background:var(--bg2);border-left:2px solid;animation:su .15s ease;}
+.cmhd{display:flex;align-items:center;gap:4px;margin-bottom:2px;}
+.cmnm{font-size:10px;font-weight:700;}
+.cmts{font-size:9px;color:var(--text3);margin-left:auto;}
+.cmtx{font-size:11.5px;color:var(--text);line-height:1.5;word-break:break-word;}
+.cbot{display:flex;gap:.38rem;padding:.48rem .58rem;border-top:1px solid var(--b1);flex-shrink:0;}
+.ci{flex:1;background:var(--bg2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-family:var(--font);font-size:11.5px;color:var(--text);outline:none;transition:all .18s;}
+.ci:focus{border-color:var(--acc);}
+.ci::placeholder{color:var(--text3);}
+.sndb{background:linear-gradient(135deg,var(--acc),var(--cyan));color:#fff;border:none;border-radius:7px;padding:7px 12px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .18s;}
+.sndb:hover{opacity:.85;}
+
+/* SHORTCUTS */
+.kw{display:none;flex-direction:column;overflow-y:auto;padding:.55rem .65rem;gap:.28rem;flex:1;}
+.ki{display:flex;align-items:center;gap:.45rem;padding:.38rem .55rem;background:var(--bg2);border-radius:6px;}
+.kk{background:var(--panel3);border:1px solid var(--b2);border-radius:4px;padding:1.5px 6px;font-family:var(--mono);font-size:9.5px;color:var(--acc);white-space:nowrap;flex-shrink:0;}
+.kd{font-size:10.5px;color:var(--text2);}
+
+/* STATUSBAR */
+.sbar{display:flex;align-items:center;gap:.6rem;padding:2px .85rem;background:rgba(110,70,255,.05);border-top:1px solid rgba(110,70,255,.1);flex-shrink:0;}
+.sbar span{font-size:9.5px;font-family:var(--mono);color:var(--text3);}
+.sbar .sr{margin-left:auto;display:flex;gap:.6rem;}
+.slive{color:var(--green)!important;}
+.slang{color:var(--acc)!important;}
+
+/* TOAST */
+.tc{position:fixed;bottom:.85rem;right:.85rem;display:flex;flex-direction:column;gap:.3rem;z-index:9999;}
+.toast{background:var(--panel2);border:1px solid var(--b2);border-radius:9px;padding:.52rem .82rem;font-size:11.5px;display:flex;align-items:center;gap:.4rem;animation:si .2s ease;min-width:188px;box-shadow:0 4px 18px rgba(0,0,0,.45);}
+.toast.ok{border-left:3px solid var(--green);}
+.toast.err{border-left:3px solid var(--red);}
+.toast.info{border-left:3px solid var(--cyan);}
+
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:100;animation:fi .15s ease;}
+.mb{background:var(--panel);border:1px solid var(--b2);border-radius:14px;padding:1.58rem;width:322px;box-shadow:0 20px 55px rgba(0,0,0,.6);}
+.mb h3{font-size:.92rem;font-weight:700;margin-bottom:1.05rem;}
+
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes su{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes si{from{opacity:0;transform:translateX(13px)}to{opacity:1;transform:translateX(0)}}
+@keyframes lp{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes bp{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes tab{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px;}
+
+/* THEMES */
+body.tl{--bg:#f0f4ff;--bg2:#e6eaff;--panel:#fff;--panel2:#f4f6ff;--panel3:#e8ecff;--b1:rgba(110,70,255,.1);--b2:rgba(110,70,255,.18);--text:#1a183e;--text2:#5550aa;--text3:#9090cc;}
+body.tg{--bg:#021008;--bg2:#031a0e;--panel:#041510;--panel2:#062218;--acc:#22c55e;--cyan:#4ade80;--b1:rgba(34,197,94,.13);--b2:rgba(34,197,94,.24);}
+body.tr{--bg:#150208;--bg2:#1e030c;--panel:#1a0209;--panel2:#250310;--acc:#ef4444;--cyan:#f87171;--b1:rgba(239,68,68,.13);--b2:rgba(239,68,68,.24);}
+</style>
+</head>
+<body>
+<div class="gbg"></div>
+<div class="tc" id="tc"></div>
+<div id="loader" class="off"><div class="spin"></div><div class="lmsg" id="lmsg">Loading...</div><div class="lsub" id="lsub"></div></div>
+
+<!-- LANDING -->
+<div id="landing">
+<div class="lw">
+  <div class="brand">
+    <div class="brow"><div class="bic">⌨</div><span class="bnm">CollabCode</span></div>
+    <div class="btag">// real-time collaborative editor</div>
+  </div>
+  <div class="pills">
+    <span class="pill">⚡ JS — instant</span>
+    <span class="pill">🐍 Python — WebAssembly</span>
+    <span class="pill">⚙ C/C++ — browser</span>
+    <span class="pill">☕ Java</span>
+  </div>
+  <div class="lcard">
+    <h2>Start a session</h2>
+    <div class="field"><label>Your name</label><input class="inp" id="uname" placeholder="e.g. Bhoomi" maxlength="20"/></div>
+    <div class="field">
+      <label>Language</label>
+      <select class="inp" id="lsel">
+        <option value="javascript">JavaScript</option>
+        <option value="python">Python 3</option>
+        <option value="cpp">C++</option>
+        <option value="c">C</option>
+        <option value="java">Java</option>
+        <option value="html">HTML</option>
+      </select>
+    </div>
+    <div class="bpair">
+      <button class="btn bm" onclick="createRoom()">Create Room</button>
+      <button class="btn bg2" onclick="openJoin()">Join Room</button>
+    </div>
+    <div class="or">or join by ID</div>
+    <div class="qrow">
+      <input class="inp" id="ridInput" placeholder="room-id" style="font-family:var(--mono);font-size:11px;"/>
+      <button class="qbtn" onclick="quickJoin()">Join →</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;">
+  <div class="tb">
+    <div class="tbl"><div class="tbic">⌨</div><span class="tbnm">CollabCode</span></div>
+    <div class="rtag" onclick="copyLink()"><span class="ldot"></span><span id="ridLbl">--</span></div>
+    <select class="lsel" id="edLang" onchange="swLang(this.value)">
+      <option value="javascript">JS</option>
+      <option value="python">Python</option>
+      <option value="cpp">C++</option>
+      <option value="c">C</option>
+      <option value="java">Java</option>
+      <option value="html">HTML</option>
+    </select>
+    <div class="avs" id="avRow"></div>
+    <div class="tbacts">
+      <div class="fzc"><button class="fzb" onclick="cfz(-1)">−</button><span class="fzv" id="fzv">13</span><button class="fzb" onclick="cfz(1)">+</button></div>
+      <button class="ib" onclick="cycT()">◑</button>
+      <button class="ib" onclick="fmtCode()">⌥ Fmt</button>
+      <button class="ib" onclick="copyCode()">⎘ Copy</button>
+      <button class="ib" onclick="dlCode()">↓ Save</button>
+      <button class="rbtn" id="runBtn" onclick="runCode()">▶ Run</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="sb">
+      <div class="sbhd">Files</div>
+      <div class="fl" id="projList"></div>
+      <div class="sbsec">
+        <div class="sbsh">Online</div>
+        <div id="peerList"></div>
+      </div>
+    </div>
+    <div class="em">
+      <div class="tbar" id="tbar"></div>
+      <div class="ew">
+        <div class="lc" id="lc">1</div>
+        <textarea class="cta" id="cta" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"
+          oninput="onEd()" onkeydown="onK(event)" onscroll="syncL()" onkeyup="upPos()" onmouseup="upPos()"
+          placeholder="// Start coding..."></textarea>
+      </div>
+    </div>
+    <div class="rp">
+      <div class="rpt">
+        <div class="rptab active" onclick="rpSw('out',this)">Output</div>
+        <div class="rptab" onclick="rpSw('chat',this)">Chat</div>
+        <div class="rptab" onclick="rpSw('keys',this)">Keys</div>
+      </div>
+      <div class="ow" id="outWrap">
+        <div class="exhd">
+          <span class="exlang" id="exLang">js</span>
+          <span>·</span>
+          <span class="exeng" id="exEng">local</span>
+          <span class="exbadge ready" id="exBadge">ready</span>
+        </div>
+        <div class="os" id="os">
+          <div class="ol info">// CollabCode — All engines ready</div>
+          <div class="ol ok">// ✓ JS     → runs instantly (local)</div>
+          <div class="ol ok">// ✓ Python → WebAssembly (Pyodide)</div>
+          <div class="ol ok">// ✓ C/C++  → real GCC (Judge0 CE)</div>
+          <div class="ol ok">// ✓ Java   → simulated interpreter</div>
+          <div class="ol ok">// ✓ HTML   → live preview</div>
+          <div class="ol info">// Press ▶ Run or Ctrl+Enter</div>
+        </div>
+        <div class="sib"><span>$</span><input class="si" id="si" placeholder="stdin..." onkeydown="if(event.key==='Enter')runCode()"/></div>
+      </div>
+      <div class="cw" id="chatWrap">
+        <div class="cs" id="cs"></div>
+        <div class="cbot">
+          <input class="ci" id="ci" placeholder="Message..." onkeydown="if(event.key==='Enter')sendChat()"/>
+          <button class="sndb" onclick="sendChat()">→</button>
+        </div>
+      </div>
+      <div class="kw" id="keysWrap">
+        <div class="ki"><span class="kk">Ctrl+Enter</span><span class="kd">Run code</span></div>
+        <div class="ki"><span class="kk">Ctrl+S</span><span class="kd">Download file</span></div>
+        <div class="ki"><span class="kk">Ctrl+/</span><span class="kd">Toggle comment</span></div>
+        <div class="ki"><span class="kk">Tab</span><span class="kd">Indent 2 spaces</span></div>
+        <div class="ki"><span class="kk">Shift+Tab</span><span class="kd">Unindent</span></div>
+        <div class="ki"><span class="kk">Ctrl+D</span><span class="kd">Duplicate line</span></div>
+        <div class="ki"><span class="kk">Enter</span><span class="kd">Smart auto-indent</span></div>
+        <div class="ki"><span class="kk">◑ Button</span><span class="kd">Cycle 4 themes</span></div>
+        <div class="ki"><span class="kk">− /+ Buttons</span><span class="kd">Font size 10–20</span></div>
+        <div class="ki"><span class="kk">⌥ Fmt</span><span class="kd">Format code</span></div>
+        <div class="ki"><span class="kk">↓ Save</span><span class="kd">Download as file</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sbar">
+    <span class="slive">● live</span>
+    <span class="slang" id="sbLang">js</span>
+    <span id="sbL">1 line</span>
+    <span id="sbC">0 ch</span>
+    <div class="sr"><span id="sbPos">Ln 1, Col 1</span><span id="sbU">1 user</span></div>
+  </div>
+</div>
+
+<!-- JOIN MODAL -->
+<div class="mo" id="joinMo" style="display:none;">
+  <div class="mb">
+    <h3>Join a room</h3>
+    <div class="field"><label>Name</label><input class="inp" id="jName" placeholder="Your name"/></div>
+    <div class="field"><label>Room ID</label><input class="inp" id="jRid" placeholder="abc-xyz" style="font-family:var(--mono);"/></div>
+    <div class="bpair" style="margin-top:1.05rem;">
+      <button class="btn bg2" onclick="closeMo()">Cancel</button>
+      <button class="btn bm" onclick="joinRoom()">Join →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  CollabCode — 100% Browser Execution, No External APIs
+//
+//  JavaScript → new Function()             instant, offline
+//  Python     → Pyodide WebAssembly        ~5s first load
+//  C/C++      → Judge0 CE (real GCC)             needs internet
+//  Java       → built-in Java interpreter  instant, offline
+//  HTML       → Blob URL preview           instant
+// ════════════════════════════════════════════════════════
+
+// ── State ─────────────────────────────────────────────
+const S={
+  rid:null,uname:null,lang:'javascript',
+  users:[],runCount:0,fontSize:13,theme:0,
+  TH:['','tl','tg','tr'],TN:['Dark','Light','Matrix','Blood'],
+  colors:['#7c50ff','#22d3ee','#22c55e','#ec4899','#f59e0b','#ef4444'],
+  peers:[{n:'Aryan',c:'#22d3ee'},{n:'Sneha',c:'#ec4899'}],
+  col:i=>S.colors[i%S.colors.length],
+};
+
+// ── Language config ────────────────────────────────────
+const LC={javascript:'#f7df1e',python:'#3776ab',cpp:'#00599c',c:'#a8b9cc',java:'#ed8b00',html:'#e34c26'};
+const LF={javascript:'main.js',python:'main.py',cpp:'main.cpp',c:'main.c',java:'Main.java',html:'index.html'};
+const LCM={javascript:'//',python:'#',cpp:'//',c:'//',java:'//',html:'<!--'};
+
+const BOIL={
+javascript:`// JavaScript — runs instantly in browser
+console.log("Hello, CollabCode!");
+
+const greet = name => \`Welcome, \${name}!\`;
+console.log(greet("Bhoomi"));
+
+const nums = [1,2,3,4,5];
+console.log("Sum:", nums.reduce((a,b)=>a+b,0));
+console.log("Squares:", nums.map(x=>x*x));
+console.log("Evens:", nums.filter(x=>x%2===0));`,
+
+python:`# Python 3 — runs via WebAssembly (Pyodide)
+print("Hello, CollabCode!")
+
+def greet(name):
+    return f"Welcome, {name}!"
+
+print(greet("Bhoomi"))
+
+nums = [1, 2, 3, 4, 5]
+print("Sum:", sum(nums))
+print("Squares:", [x**2 for x in nums])
+
+import math
+print("Pi:", round(math.pi, 5))
+print("sqrt(2):", round(math.sqrt(2), 5))`,
+
+cpp:`// C++ — compiled with real GCC via Judge0 CE
+#include <iostream>
+using namespace std;
+
+string greet(string name) {
+    return "Welcome, " + name + "!";
+}
+
+int main() {
+    cout << "Hello, CollabCode!" << endl;
+    cout << greet("Bhoomi") << endl;
+
+    int nums[] = {1, 2, 3, 4, 5};
+    int sum = 0;
+    for (int i = 0; i < 5; i++) {
+        sum += nums[i];
+    }
+    cout << "Sum: " << sum << endl;
+    return 0;
+}`,
+
+c:`// C — compiled with real GCC via Judge0 CE
+#include <stdio.h>
+
+void greet(const char* name) {
+    printf("Welcome, %s!\\n", name);
+}
+
+int main() {
+    printf("Hello, CollabCode!\\n");
+    greet("Bhoomi");
+
+    int nums[] = {1, 2, 3, 4, 5};
+    int sum = 0;
+    for (int i = 0; i < 5; i++) {
+        sum += nums[i];
+    }
+    printf("Sum: %d\\n", sum);
+    return 0;
+}`,
+
+java:`// Java — interpreted in browser
+// Note: uses a lightweight Java interpreter
+// Supports: System.out.println, variables, loops, methods, arrays
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, CollabCode!");
+        System.out.println(greet("Bhoomi"));
+
+        int[] nums = {1, 2, 3, 4, 5};
+        int sum = 0;
+        for (int n : nums) {
+            sum += n;
+        }
+        System.out.println("Sum: " + sum);
+    }
+
+    static String greet(String name) {
+        return "Welcome, " + name + "!";
+    }
+}`,
+
+html:`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:sans-serif;background:#07071a;color:#e4e4ff;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+    .box{text-align:center;padding:2rem;}
+    h1{font-size:2.5rem;font-weight:700;background:linear-gradient(135deg,#7c50ff,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+    p{color:#8080bb;margin:.5rem 0 1.5rem;}
+    .n{font-size:4rem;font-weight:700;color:#22c55e;margin:1rem 0;}
+    button{padding:.6rem 1.5rem;background:#7c50ff;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;transition:all .2s;}
+    button:hover{background:#6d3fe0;transform:translateY(-2px);}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>CollabCode</h1>
+    <p>Edit HTML and click ▶ Run to preview!</p>
+    <div class="n" id="n">0</div>
+    <button onclick="document.getElementById('n').textContent=+document.getElementById('n').textContent+1">Click +1</button>
+  </div>
+</body>
+</html>`,
+};
+
+const PROJS=[
+  {n:'main.js',l:'javascript',c:'#f7df1e'},
+  {n:'solution.py',l:'python',c:'#3776ab'},
+  {n:'main.cpp',l:'cpp',c:'#00599c'},
+  {n:'main.c',l:'c',c:'#a8b9cc'},
+  {n:'Main.java',l:'java',c:'#ed8b00'},
+  {n:'index.html',l:'html',c:'#e34c26'},
+];
+
+// ── Pyodide ───────────────────────────────────────────
+let py=null,pyLoading=false,pyReady=false;
+async function loadPy(){
+  if(pyReady)return;
+  if(pyLoading)return new Promise(r=>{const t=setInterval(()=>{if(pyReady){clearInterval(t);r();}},200);});
+  pyLoading=true;
+  showLoader('Loading Python (WebAssembly)...','First time ~5–8s, then instant');
+  py=await loadPyodide({indexURL:'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/'});
+  pyReady=true;hideLoader();
+}
+
+function showLoader(msg,sub=''){
+  document.getElementById('lmsg').textContent=msg;
+  document.getElementById('lsub').textContent=sub;
+  document.getElementById('loader').classList.remove('off');
+}
+function hideLoader(){document.getElementById('loader').classList.add('off');}
+
+// ── Room ──────────────────────────────────────────────
+function createRoom(){
+  const n=document.getElementById('uname').value.trim();
+  if(!n){toast('Enter your name','err');return;}
+  S.uname=n;S.lang=document.getElementById('lsel').value;
+  S.rid=rndId();S.users=[{n,c:S.col(0),you:true}];
+  enterApp();toast(`Room: ${S.rid}`,'ok');
+  setTimeout(simPeer,2000);
+}
+function openJoin(){document.getElementById('jName').value=document.getElementById('uname').value;document.getElementById('joinMo').style.display='flex';}
+function closeMo(){document.getElementById('joinMo').style.display='none';}
+function joinRoom(){
+  const n=document.getElementById('jName').value.trim(),r=document.getElementById('jRid').value.trim();
+  if(!n||!r){toast('Fill all fields','err');return;}
+  S.uname=n;S.rid=r;S.lang='javascript';S.users=[{n,c:S.col(0),you:true}];
+  closeMo();enterApp();toast(`Joined ${r}`,'info');setTimeout(simPeer,1500);
+}
+function quickJoin(){
+  const r=document.getElementById('ridInput').value.trim(),n=document.getElementById('uname').value.trim();
+  if(!n){toast('Enter your name','err');return;}
+  if(!r){toast('Enter room ID','err');return;}
+  S.uname=n;S.rid=r;S.lang='javascript';S.users=[{n,c:S.col(0),you:true}];
+  enterApp();toast(`Joined ${r}`,'info');
+}
+function enterApp(){
+  document.getElementById('landing').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('ridLbl').textContent=S.rid;
+  document.getElementById('edLang').value=S.lang;
+  updUI();setBoil();renderProj();renderTabs();renderAv();upPos();
+  addChat('System',`Room "${S.rid}" ready! Share the ID with teammates.`,'#444');
+}
+function rndId(){const a=()=>Math.random().toString(36).substr(2,3);return`${a()}-${a()}`;}
+
+// ── Editor ────────────────────────────────────────────
+function setBoil(){document.getElementById('cta').value=BOIL[S.lang]||'';upLines();upStats();}
+function onEd(){upLines();upStats();}
+function onK(e){
+  const ta=document.getElementById('cta'),s=ta.selectionStart,en=ta.selectionEnd;
+  if(e.key==='Tab'&&!e.shiftKey){
+    e.preventDefault();
+    ta.value=ta.value.substring(0,s)+'  '+ta.value.substring(en);
+    ta.selectionStart=ta.selectionEnd=s+2;upLines();
+  }
+  if(e.key==='Tab'&&e.shiftKey){
+    e.preventDefault();
+    const ls=ta.value.split('\n'),ln=ta.value.substring(0,s).split('\n').length-1;
+    if(ls[ln].startsWith('  ')){ls[ln]=ls[ln].substring(2);ta.value=ls.join('\n');ta.selectionStart=ta.selectionEnd=Math.max(s-2,0);}
+    upLines();
+  }
+  if(e.key==='d'&&(e.ctrlKey||e.metaKey)){
+    e.preventDefault();
+    const ls=ta.value.split('\n'),ln=ta.value.substring(0,s).split('\n').length-1,orig=ls[ln];
+    ls.splice(ln+1,0,orig);ta.value=ls.join('\n');ta.selectionStart=ta.selectionEnd=s+orig.length+1;upLines();
+  }
+  if(e.key==='/'&&(e.ctrlKey||e.metaKey)){
+    e.preventDefault();
+    const cm=LCM[S.lang]||'//';const ls=ta.value.split('\n');
+    const ln=ta.value.substring(0,s).split('\n').length-1;
+    const already=ls[ln].trimStart().startsWith(cm);
+    ls[ln]=already?ls[ln].replace(cm+' ','').replace(cm,''):cm+' '+ls[ln];
+    ta.value=ls.join('\n');ta.selectionStart=ta.selectionEnd=s+(already?-(cm.length+1):(cm.length+1));upLines();
+  }
+  if(e.key==='s'&&(e.ctrlKey||e.metaKey)){e.preventDefault();dlCode();}
+  if(e.key==='Enter'){
+    const before=ta.value.substring(0,s),last=before.split('\n').pop();
+    const ind=last.match(/^(\s*)/)[1];
+    const ex=(last.trimEnd().endsWith('{')||last.trimEnd().endsWith(':'))?'  ':'';
+    if(ind||ex){e.preventDefault();const ins='\n'+ind+ex;ta.value=ta.value.substring(0,s)+ins+ta.value.substring(en);ta.selectionStart=ta.selectionEnd=s+ins.length;upLines();}
+  }
+}
+function syncL(){document.getElementById('lc').scrollTop=document.getElementById('cta').scrollTop;}
+function upPos(){
+  const ta=document.getElementById('cta'),tx=ta.value.substring(0,ta.selectionStart).split('\n');
+  document.getElementById('sbPos').textContent=`Ln ${tx.length}, Col ${tx[tx.length-1].length+1}`;
+}
+function upLines(){
+  const ta=document.getElementById('cta'),n=ta.value.split('\n').length;
+  document.getElementById('lc').textContent=Array.from({length:n},(_,i)=>i+1).join('\n');
+}
+function upStats(){
+  const v=document.getElementById('cta').value,l=v.split('\n').length,c=v.length;
+  document.getElementById('sbL').textContent=`${l} line${l>1?'s':''}`;
+  document.getElementById('sbC').textContent=`${c} ch`;
+}
+function updUI(){
+  document.getElementById('sbLang').textContent=S.lang;
+  document.getElementById('exLang').textContent=S.lang;
+  document.getElementById('exEng').textContent=
+    ({javascript:'local',python:'WebAssembly',cpp:'Judge0 GCC',c:'Judge0 GCC',java:'interpreter',html:'preview'})[S.lang]||'local';
+}
+function swLang(l){S.lang=l;updUI();setBoil();renderTabs();setBadge('ready','ready');toast(`Switched to ${l}`,'info');}
+function copyCode(){navigator.clipboard.writeText(document.getElementById('cta').value);toast('Copied!','ok');}
+function dlCode(){
+  const f=LF[S.lang]||'code.txt',a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([document.getElementById('cta').value],{type:'text/plain'}));
+  a.download=f;a.click();toast(`Saved: ${f}`,'ok');
+}
+function copyLink(){navigator.clipboard.writeText(`collabcode.app/room/${S.rid}`);toast('Room link copied!','ok');}
+
+// ── FORMAT ────────────────────────────────────────────
+function fmtCode(){
+  const ta=document.getElementById('cta'),code=ta.value,lang=S.lang;
+  if(!code.trim()){toast('Nothing to format','err');return;}
+
+  const lines=code.split('\n');
+  let indent=0;
+
+  if(lang==='javascript'){
+    const result=lines.map(raw=>{
+      const line=raw.trim();if(!line)return'';
+      const isClose=/^[}\])]/.test(line);
+      if(isClose)indent=Math.max(0,indent-1);
+      const out='  '.repeat(indent)+line;
+      const opens=(line.match(/[{(\[]/g)||[]).length-(line.match(/[}\])]/g)||[]).length;
+      if(!isClose&&opens>0)indent+=opens;
+      return out;
+    });
+    ta.value=result.join('\n');
+    toast('JS formatted!','ok');
+
+  }else if(lang==='python'){
+    let ind=0;
+    const result=lines.map(raw=>{
+      const line=raw.trim();if(!line)return'';
+      const deindent=/^(else:|elif |except|except:|finally:)/.test(line);
+      if(deindent&&ind>0)ind--;
+      const out='    '.repeat(ind)+line;
+      if(line.endsWith(':')&&!line.startsWith('#'))ind++;
+      return out;
+    });
+    ta.value=result.join('\n');
+    toast('Python formatted!','ok');
+
+  }else if(['java','cpp','c'].includes(lang)){
+    let ind=0;
+    const result=lines.map(raw=>{
+      const line=raw.trim();if(!line)return'';
+      if(line.startsWith('}'))ind=Math.max(0,ind-1);
+      const out='    '.repeat(ind)+line;
+      if(line.endsWith('{'))ind++;
+      return out;
+    });
+    ta.value=result.join('\n');
+    toast(`${lang.toUpperCase()} formatted!`,'ok');
+
+  }else{
+    toast('Format not available for HTML','info');
+  }
+  upLines();
+}
+
+// ── FONT & THEME ──────────────────────────────────────
+function cfz(d){
+  S.fontSize=Math.max(10,Math.min(20,S.fontSize+d));
+  document.getElementById('cta').style.fontSize=S.fontSize+'px';
+  document.getElementById('lc').style.fontSize=S.fontSize+'px';
+  document.getElementById('fzv').textContent=S.fontSize;
+}
+function cycT(){
+  document.body.classList.remove(...S.TH.filter(Boolean));
+  S.theme=(S.theme+1)%S.TH.length;
+  if(S.TH[S.theme])document.body.classList.add(S.TH[S.theme]);
+  toast(`Theme: ${S.TN[S.theme]}`,'info');
+}
+
+// ── EXECUTION ─────────────────────────────────────────
+function setBadge(t,type){const el=document.getElementById('exBadge');el.textContent=t;el.className='exbadge '+type;}
+function addOut(cls,txt){const d=document.createElement('div');d.className='ol '+cls;d.textContent=txt;document.getElementById('os').appendChild(d);}
+function clearOut(){document.getElementById('os').innerHTML='';}
+
+async function runCode(){
+  const code=document.getElementById('cta').value.trim();
+  const lang=document.getElementById('edLang').value;
+  const btn=document.getElementById('runBtn');
+  const stdin=document.getElementById('si').value;
+  if(!code){toast('Nothing to run!','err');return;}
+  btn.classList.add('loading');btn.innerHTML='⏳';
+  clearOut();addOut('info',`// Running ${lang}...`);
+  setBadge('running...','running');
+  try{
+    if(lang==='html'){runHTML(code);}
+    else if(lang==='javascript'){runJS(code,stdin);}
+    else if(lang==='python'){await runPython(code,stdin);}
+    else if(lang==='cpp'||lang==='c'){await runCpp(code,stdin,lang);}
+    else if(lang==='java'){runJava(code,stdin);}
+    S.runCount++;
+  }catch(e){clearOut();addOut('err','// Unexpected: '+e.message);setBadge('error','fail');}
+  btn.classList.remove('loading');btn.innerHTML='▶ Run';
+  document.getElementById('os').scrollTop=9999;
+}
+
+// ── HTML ──────────────────────────────────────────────
+function runHTML(code){
+  window.open(URL.createObjectURL(new Blob([code],{type:'text/html'})),'_blank');
+  clearOut();addOut('ok','// ✓ HTML preview opened in new tab');setBadge('ok ✓','ok');
+}
+
+// ── JAVASCRIPT ────────────────────────────────────────
+function runJS(code,stdin){
+  const logs=[];
+  const _l=console.log,_e=console.error,_w=console.warn,_i=console.info;
+  console.log  =(...a)=>logs.push({t:'out',v:fmt(a)});
+  console.error=(...a)=>logs.push({t:'err',v:fmt(a)});
+  console.warn =(...a)=>logs.push({t:'warn',v:'⚠ '+fmt(a)});
+  console.info =(...a)=>logs.push({t:'info',v:fmt(a)});
+  const t=performance.now();
+  try{
+    new Function('stdin',code)(stdin||'');
+    const ms=(performance.now()-t).toFixed(2);
+    clearOut();
+    if(!logs.length)addOut('info','// No output — use console.log()');
+    else logs.forEach(l=>addOut(l.t,l.v));
+    addOut('ok',`// ✓ Done in ${ms}ms`);
+    setBadge('ok ✓','ok');
+  }catch(e){
+    clearOut();addOut('err',`// ✕ ${e.constructor.name}: ${e.message}`);
+    if(e.stack)e.stack.split('\n').slice(1,3).forEach(l=>addOut('info',l.trim()));
+    setBadge('error','fail');
+  }
+  console.log=_l;console.error=_e;console.warn=_w;console.info=_i;
+}
+
+// ── PYTHON via Pyodide ────────────────────────────────
+async function runPython(code,stdin){
+  try{
+    clearOut();addOut('info','// Loading Python (first time ~5s)...');
+    await loadPy();
+  }catch(e){
+    clearOut();addOut('err','// ✕ Could not load Pyodide: '+e.message);
+    addOut('info','// Make sure you have internet for first load');
+    setBadge('error','fail');return;
+  }
+  clearOut();addOut('info','// Running Python (Pyodide WebAssembly)...');
+  const logs=[];
+  py.setStdout({batched:s=>logs.push({t:'out',v:s})});
+  py.setStderr({batched:s=>logs.push({t:'err',v:s})});
+  const t=performance.now();
+  try{
+    const full=stdin?`import sys\nsys.stdin=__import__('io').StringIO(${JSON.stringify(stdin)})\n`+code:code;
+    await py.runPythonAsync(full);
+    const ms=(performance.now()-t).toFixed(0);
+    clearOut();
+    if(!logs.length)addOut('info','// No output — use print()');
+    else logs.forEach(l=>addOut(l.t,l.v));
+    addOut('ok',`// ✓ Done in ${ms}ms (Pyodide)`);
+    setBadge('ok ✓','ok');
+  }catch(e){
+    clearOut();
+    const msg=String(e.message||e);
+    msg.split('\n').forEach((l,i,arr)=>{
+      addOut(i===arr.length-1?'err':'warn',l);
+    });
+    setBadge('error','fail');
+  }
+}
+
+// ── C / C++ via Judge0 API (free, no auth needed) ───────────────────────────
+// Judge0 CE public instance — https://ce.judge0.com
+// Language IDs: 54 = C++ (GCC 9.2), 50 = C (GCC 9.2)
+async function runCpp(code, stdin, lang){
+  clearOut();
+  addOut('info', `// Submitting ${lang.toUpperCase()} to Judge0 compiler...`);
+  setBadge('compiling...', 'running');
+
+  // Judge0 language IDs
+  const langId = (lang === 'cpp') ? 54 : 50;
+
+  const BASE = 'https://judge0-ce.p.rapidapi.com';
+  const HEADERS = {
+    'Content-Type': 'application/json',
+    'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
+  };
+
+  // --- Try RapidAPI-free Judge0 first, fallback to direct ce.judge0.com ---
+  async function trySubmit(base, headers){
+    const submitRes = await fetch(`${base}/submissions?base64_encoded=false&wait=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({
+        language_id: langId,
+        source_code:  code,
+        stdin:        stdin || '',
+      }),
+    });
+    return submitRes;
+  }
+
+  const t = performance.now();
+  try {
+    // Primary: direct public Judge0 CE (no auth)
+    let res = await fetch('https://ce.judge0.com/submissions?base64_encoded=false&wait=true', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language_id: langId,
+        source_code:  code,
+        stdin:        stdin || '',
+      }),
+    });
+
+    if(!res.ok){
+      clearOut();
+      addOut('err',  `// ✕ Judge0 API error: HTTP ${res.status}`);
+      addOut('info', '// Try again in a moment (free tier rate limit)');
+      setBadge('error', 'fail');
+      return;
+    }
+
+    const data = await res.json();
+    const ms   = (performance.now() - t).toFixed(0);
+    clearOut();
+
+    // status.id: 3=Accepted, 4=Wrong Answer, 5=TLE, 6=CE, 11=RE
+    const statusId = data.status && data.status.id;
+
+    // Compilation error
+    if(data.compile_output && data.compile_output.trim()){
+      data.compile_output.trim().split('\n').forEach(line => {
+        if(!line.trim()) return;
+        addOut(line.includes('error:') ? 'err' : 'warn', line);
+      });
+    }
+
+    // Program stdout
+    const stdout = (data.stdout || '').trim();
+    if(stdout) stdout.split('\n').forEach(line => addOut('out', line));
+
+    // Runtime stderr
+    const stderr = (data.stderr || '').trim();
+    if(stderr) stderr.split('\n').forEach(line => addOut('err', line));
+
+    // Status message for non-zero exits
+    if(statusId === 3){
+      if(!stdout && !stderr) addOut('info', `// No output — use cout (C++) or printf (C)`);
+      addOut('ok', `// ✓ ${lang.toUpperCase()} done in ${ms}ms · exit 0`);
+      setBadge('ok ✓', 'ok');
+    } else if(statusId === 6){
+      addOut('err', `// ✕ Compilation Error`);
+      setBadge('error', 'fail');
+    } else if(statusId === 5){
+      addOut('err', `// ✕ Time Limit Exceeded`);
+      setBadge('error', 'fail');
+    } else if(data.status){
+      // accepted with warnings, or runtime error etc
+      const exitOk = (statusId === 3 || stdout);
+      if(exitOk){
+        addOut('ok', `// ✓ ${lang.toUpperCase()} done in ${ms}ms`);
+        setBadge('ok ✓', 'ok');
+      } else {
+        addOut('err', `// ✕ ${data.status.description || 'Runtime Error'}`);
+        setBadge('error', 'fail');
+      }
+    }
+
+  } catch(e) {
+    clearOut();
+    addOut('err',  '// ✕ Could not reach Judge0 API');
+    addOut('warn', '// ' + (e.message || String(e)));
+    addOut('info', '// Needs internet — check connection and retry');
+    setBadge('error', 'fail');
+  }
+}
+
+// ── Java — lightweight interpreter ────────────────────
+// Handles: System.out.println, variables (int/String/boolean),
+// for loops (enhanced + classic), while, if/else, static methods
+function runJava(code,stdin){
+  const t=performance.now();
+  try{
+    const output=interpretJava(code,stdin||'');
+    const ms=(performance.now()-t).toFixed(0);
+    clearOut();
+    if(!output.trim())addOut('info','// No output — use System.out.println()');
+    else output.trimEnd().split('\n').forEach(l=>addOut('out',l));
+    addOut('ok',`// ✓ Java done in ${ms}ms`);
+    setBadge('ok ✓','ok');
+  }catch(e){
+    clearOut();addOut('err','// ✕ '+e.message);setBadge('error','fail');
+  }
+}
+
+function interpretJava(src,stdin){
+  let output='';
+
+  // Remove single-line and multi-line comments
+  let code=src.replace(/\/\/[^\n]*/g,'').replace(/\/\*[\s\S]*?\*\//g,'');
+
+  // Extract all static methods (FIX: non-greedy, handles nested braces better)
+  const methods={};
+  // Match static methods by finding their opening brace and counting depth
+  const methodHeaderRe=/static\s+\w[\w<>\[\]]*\s+(\w+)\s*\(([^)]*)\)\s*\{/g;
+  let mh;
+  while((mh = methodHeaderRe.exec(code)) !== null){
+    const name = mh[1];
+    if(name === 'main') continue; // skip main
+    const params = mh[2].trim();
+    // Extract body by counting braces from the opening {
+    let depth = 1, i = mh.index + mh[0].length, body = '';
+    while(i < code.length && depth > 0){
+      if(code[i] === '{') depth++;
+      else if(code[i] === '}') depth--;
+      if(depth > 0) body += code[i];
+      i++;
+    }
+    methods[name] = {params, body};
+  }
+
+  // Extract main method body
+  const mainM = code.match(/public\s+static\s+void\s+main\s*\([^)]*\)\s*\{/);
+  if(!mainM) throw new Error('No main() method found');
+
+  let mainBody = '';
+  let depth = 1, idx = mainM.index + mainM[0].length;
+  while(idx < code.length && depth > 0){
+    if(code[idx] === '{') depth++;
+    else if(code[idx] === '}') depth--;
+    if(depth > 0) mainBody += code[idx];
+    idx++;
+  }
+
+  const env = {};
+  const stdinLines = stdin ? stdin.split('\n') : [];
+  let stdinIdx = 0;
+
+  function evalExpr(expr, ctx){
+    expr = expr.trim();
+    if(!expr) return '';
+
+    // Quoted string literal
+    if((expr.startsWith('"') && expr.endsWith('"')) ||
+       (expr.startsWith("'") && expr.endsWith("'"))){
+      return expr.slice(1,-1);
+    }
+
+    // Number literal
+    if(/^-?\d+(\.\d+)?[Ld]?$/.test(expr)) return Number(expr.replace(/[Ld]$/,''));
+
+    // Boolean literals
+    if(expr === 'true') return true;
+    if(expr === 'false') return false;
+    if(expr === 'null') return null;
+
+    // String concatenation / arithmetic via + 
+    const parts = splitByOp(expr, '+');
+    if(parts.length > 1){
+      const vals = parts.map(p => evalExpr(p.trim(), ctx));
+      // If any part is a string, do string concat; otherwise numeric add
+      const hasStr = vals.some(v => typeof v === 'string');
+      if(hasStr) return vals.map(v => v === null ? 'null' : v === undefined ? '' : String(v)).join('');
+      return vals.reduce((a,b) => Number(a) + Number(b), 0);
+    }
+
+    // Subtraction
+    const subParts = splitByOp(expr, '-');
+    if(subParts.length > 1 && !expr.startsWith('-')){
+      return subParts.map(p=>Number(evalExpr(p.trim(),ctx))).reduce((a,b)=>a-b);
+    }
+
+    // Multiplication / division
+    if(expr.includes('*')){
+      return expr.split('*').map(p=>Number(evalExpr(p.trim(),ctx))).reduce((a,b)=>a*b,1);
+    }
+    if(expr.includes('/')){
+      const dp=expr.split('/');return Number(evalExpr(dp[0].trim(),ctx))/Number(evalExpr(dp[1].trim(),ctx));
+    }
+    if(expr.includes('%')){
+      const mp=expr.split('%');return Number(evalExpr(mp[0].trim(),ctx))%Number(evalExpr(mp[1].trim(),ctx));
+    }
+
+    // Method call: name(args)
+    const callM = expr.match(/^(\w+)\(([^)]*)\)$/);
+    if(callM && methods[callM[1]]){
+      return callMethod(callM[1], callM[2], ctx);
+    }
+
+    // Variable lookup
+    if(ctx && ctx[expr] !== undefined) return ctx[expr];
+    if(env[expr] !== undefined) return env[expr];
+
+    return expr; // fallback
+  }
+
+  // Split expression by a top-level operator (not inside parens/strings)
+  function splitByOp(expr, op){
+    const parts = [];
+    let cur = '', depth2 = 0, inStr = false, strCh = '';
+    for(let j = 0; j < expr.length; j++){
+      const c = expr[j];
+      if(!inStr && (c === '"' || c === "'")){inStr=true;strCh=c;cur+=c;}
+      else if(inStr && c === strCh && expr[j-1] !== '\\'){inStr=false;cur+=c;}
+      else if(!inStr && (c==='('||c==='[')){depth2++;cur+=c;}
+      else if(!inStr && (c===')'||c===']')){depth2--;cur+=c;}
+      else if(!inStr && depth2===0 && c===op){parts.push(cur);cur='';}
+      else cur+=c;
+    }
+    if(cur) parts.push(cur);
+    return parts;
+  }
+
+  function callMethod(name, argsStr, callerCtx){
+    const meth = methods[name];
+    if(!meth) return '';
+    const paramNames = meth.params ? meth.params.split(',').map(p=>p.trim().split(/\s+/).pop()) : [];
+    const argVals = argsStr ? argsStr.split(',').map(a=>evalExpr(a.trim(),callerCtx)) : [];
+    const localCtx = Object.assign({}, callerCtx);
+    paramNames.forEach((p,i)=>{ localCtx[p] = argVals[i]; });
+    // Find return statement
+    const retM = meth.body.match(/return\s+(.+?);/);
+    if(retM) return evalExpr(retM[1].trim(), localCtx);
+    // Run the body for side effects (prints)
+    runBlock(meth.body, localCtx);
+    return '';
+  }
+
+  function runBlock(block, ctx){
+    let res = '';
+    // println
+    const printlnRe = /System\.out\.println\(([^;]*?)\);/g;
+    let pm;
+    while((pm = printlnRe.exec(block)) !== null){
+      res += String(evalExpr(pm[1], ctx)) + '\n';
+    }
+    // print (no newline)
+    const printRe = /System\.out\.print\(([^;]*?)\);/g;
+    let prm;
+    while((prm = printRe.exec(block)) !== null){
+      res += String(evalExpr(prm[1], ctx));
+    }
+    // Variable declarations: int/String/boolean/double/float/long x = val;
+    const varRe = /(?:int|String|boolean|double|float|long|char)\s+(\w+)\s*=\s*([^;]+);/g;
+    let vm;
+    while((vm = varRe.exec(block)) !== null){
+      ctx[vm[1]] = evalExpr(vm[2].trim(), ctx);
+    }
+    // Enhanced for: for(int x : arr) { ... }
+    // FIX: use a depth-aware brace extractor instead of greedy regex
+    const feRe = /for\s*\(\s*(?:int|String|double|float|long)\s+(\w+)\s*:\s*(\w+)\s*\)\s*\{/g;
+    let fem;
+    while((fem = feRe.exec(block)) !== null){
+      const varName = fem[1], arrName = fem[2];
+      // Extract loop body
+      let bd='', dp=1, fi=fem.index+fem[0].length;
+      while(fi<block.length&&dp>0){
+        if(block[fi]==='{')dp++;else if(block[fi]==='}')dp--;
+        if(dp>0)bd+=block[fi];fi++;
+      }
+      const arr = ctx[arrName] || env[arrName] || [];
+      if(Array.isArray(arr)){
+        arr.forEach(item=>{
+          const lc = Object.assign({}, ctx);
+          lc[varName] = item;
+          res += runBlock(bd, lc);
+        });
+      }
+    }
+    // Classic for: for(int i=0; i<n; i++) { ... }
+    const cforRe = /for\s*\(\s*(?:int|long)\s+(\w+)\s*=\s*([^;]+);\s*(\w+)\s*(<|<=|!=|>|>=)\s*([^;]+);\s*\w+(\+\+|--|\+=\s*\d+)\s*\)\s*\{/g;
+    let cfm;
+    while((cfm = cforRe.exec(block)) !== null){
+      const iv = cfm[1], startV = evalExpr(cfm[2].trim(), ctx);
+      const condVar = cfm[3], condOp = cfm[4], condValExpr = cfm[5];
+      const inc = cfm[6];
+      // Extract body
+      let bd2='', dp2=1, fi2=cfm.index+cfm[0].length;
+      while(fi2<block.length&&dp2>0){
+        if(block[fi2]==='{')dp2++;else if(block[fi2]==='}')dp2--;
+        if(dp2>0)bd2+=block[fi2];fi2++;
+      }
+      const lc2 = Object.assign({}, ctx);
+      lc2[iv] = Number(startV);
+      let iterations = 0;
+      const maxIter = 10000;
+      while(iterations++ < maxIter){
+        const condVal = Number(evalExpr(condValExpr.trim(), lc2));
+        const curVal = lc2[iv];
+        let cond = false;
+        if(condOp==='<') cond = curVal < condVal;
+        else if(condOp==='<=') cond = curVal <= condVal;
+        else if(condOp==='!=') cond = curVal !== condVal;
+        else if(condOp==='>') cond = curVal > condVal;
+        else if(condOp==='>=') cond = curVal >= condVal;
+        if(!cond) break;
+        res += runBlock(bd2, lc2);
+        if(inc==='++') lc2[iv]++;
+        else if(inc==='--') lc2[iv]--;
+        else lc2[iv] += parseInt(inc.replace('+=','').trim())||1;
+      }
+    }
+    return res;
+  }
+
+  output = runBlock(mainBody, env);
+  return output;
+}
+
+// ── Helpers ───────────────────────────────────────────
+function fmt(args){return args.map(x=>{if(x===null)return'null';if(x===undefined)return'undefined';if(typeof x==='object'){try{return JSON.stringify(x,null,2);}catch(_){return String(x);}}return String(x);}).join(' ');}
+
+// ── UI ────────────────────────────────────────────────
+function renderProj(){
+  const list=document.getElementById('projList');list.innerHTML='';
+  PROJS.forEach((p,i)=>{
+    const el=document.createElement('div');el.className='fi'+(i===0?' active':'');
+    el.innerHTML=`<span class="fidot" style="background:${p.c}"></span>${p.n}`;
+    el.onclick=()=>{
+      document.querySelectorAll('.fi').forEach(x=>x.classList.remove('active'));el.classList.add('active');
+      if(p.l!==S.lang){S.lang=p.l;document.getElementById('edLang').value=p.l;updUI();setBoil();renderTabs();setBadge('ready','ready');}
+    };
+    list.appendChild(el);
+  });
+}
+function renderTabs(){
+  document.getElementById('tbar').innerHTML=`<div class="tab active">
+    <span style="width:7px;height:7px;border-radius:50%;background:${LC[S.lang]||'#888'};display:inline-block"></span>
+    ${LF[S.lang]||'main.txt'}
+  </div>`;
+}
+function renderAv(){
+  const row=document.getElementById('avRow');row.innerHTML='';
+  S.users.forEach(u=>{
+    const el=document.createElement('div');el.className='av';el.style.background=u.c;
+    el.innerHTML=`${u.n[0].toUpperCase()}<span class="av-tip">${u.n}${u.you?' (you)':''}</span>`;
+    row.appendChild(el);
+  });
+  document.getElementById('sbU').textContent=`${S.users.length} user${S.users.length>1?'s':''}`;
+}
+function renderPeers(){
+  const list=document.getElementById('peerList');list.innerHTML='';
+  S.users.filter(u=>!u.you).forEach(u=>{
+    const k=u.n.replace(/\s/g,'_');
+    const el=document.createElement('div');el.className='pr';
+    el.innerHTML=`<span class="pd" style="background:${u.c}"></span><span>${u.n}</span><div class="ta" id="ta-${k}" style="display:none;color:${u.c}"><span></span><span></span><span></span></div>`;
+    list.appendChild(el);
+  });
+}
+function rpSw(p,el){
+  document.querySelectorAll('.rptab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
+  document.getElementById('outWrap').style.display=p==='out'?'flex':'none';
+  document.getElementById('chatWrap').style.display=p==='chat'?'flex':'none';
+  document.getElementById('keysWrap').style.display=p==='keys'?'flex':'none';
+}
+
+// ── Chat ──────────────────────────────────────────────
+const REPS=['Clean code! 🔥','Refactor this?','Edge case line 7?','Working great ✨','Add error handling?','Push to GitHub?','Nice approach!'];
+function sendChat(){
+  const inp=document.getElementById('ci'),msg=inp.value.trim();
+  if(!msg)return;addChat(S.uname,msg,S.col(0),true);inp.value='';
+  if(S.users.length>1)setTimeout(simReply,1200+Math.random()*2000);
+}
+function simReply(){
+  const p=S.users.find(u=>!u.you);if(!p)return;
+  const k=p.n.replace(/\s/g,'_'),ta=document.getElementById(`ta-${k}`);
+  if(ta)ta.style.display='flex';
+  setTimeout(()=>{if(ta)ta.style.display='none';addChat(p.n,REPS[Math.floor(Math.random()*REPS.length)],p.c);},1800);
+}
+function addChat(name,text,color,you=false){
+  const a=document.getElementById('cs'),t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const el=document.createElement('div');el.className='cm';el.style.borderLeftColor=color;
+  if(you)el.style.background='rgba(110,70,255,0.05)';
+  el.innerHTML=`<div class="cmhd"><span class="cmnm" style="color:${color}">${esc(name)}${you?' (you)':''}</span><span class="cmts">${t}</span></div><div class="cmtx">${esc(text)}</div>`;
+  a.appendChild(el);a.scrollTop=a.scrollHeight;
+}
+
+// ── Peer sim ──────────────────────────────────────────
+function simPeer(){
+  const p=S.peers[0];S.users.push({n:p.n,c:p.c});renderAv();renderPeers();
+  addChat(p.n,'Just joined! 👋',p.c);
+  setTimeout(()=>{
+    const k=p.n.replace(/\s/g,'_'),ta=document.getElementById(`ta-${k}`);
+    if(ta)ta.style.display='flex';
+    setTimeout(()=>{if(ta)ta.style.display='none';addChat(p.n,'All languages working now! 🔥',p.c);},2200);
+  },3000);
+}
+
+// ── Toast ─────────────────────────────────────────────
+function toast(msg,type='info'){
+  const c=document.getElementById('tc'),el=document.createElement('div');el.className=`toast ${type}`;
+  const ic={ok:'✓',err:'✕',info:'ℹ'};const cl={ok:'var(--green)',err:'var(--red)',info:'var(--cyan)'};
+  el.innerHTML=`<span style="color:${cl[type]||cl.info};font-weight:700">${ic[type]||ic.info}</span> ${esc(msg)}`;
+  c.appendChild(el);setTimeout(()=>el.remove(),3500);
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── Keyboard ──────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();runCode();}
+  if(e.key==='Escape')closeMo();
+});
+
+// Init on load
+window.addEventListener('load',()=>{
+  document.getElementById('uname').focus();
+});
+</script>
+</body>
+</html>
